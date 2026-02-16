@@ -1,0 +1,91 @@
+{
+  "name": "Copy Refinement Pipeline",
+  "description": "Iterative copy generation and refinement pipeline based on the constrained copy generation framework. Uses the IterativeRefinementPipeline component to generate, evaluate, and refine marketing copies.",
+  "endpoint_name": "copy-refinement",
+  "is_component": false,
+  "data": {
+    "nodes": [
+      {
+        "id": "pipeline-node-1",
+        "type": "genericNode",
+        "position": {
+          "x": 400,
+          "y": 200
+        },
+        "data": {
+          "id": "pipeline-node-1",
+          "type": "IterativeRefinementPipeline",
+          "node": {
+            "display_name": "Iterative Refinement Pipeline",
+            "description": "Full copy generation pipeline: generate -> format -> evaluate -> refine loop.",
+            "template": {
+              "api_key": {
+                "type": "SecretStr",
+                "display_name": "OpenAI API Key",
+                "required": true,
+                "value": ""
+              },
+              "model": {
+                "type": "str",
+                "display_name": "Model",
+                "value": "gpt-4o-mini"
+              },
+              "topic": {
+                "type": "str",
+                "display_name": "Topic",
+                "required": true,
+                "value": "free delivery from store"
+              },
+              "persona": {
+                "type": "str",
+                "display_name": "Target Persona",
+                "value": "budget-conscious families"
+              },
+              "tone": {
+                "type": "str",
+                "display_name": "Tone of Voice",
+                "value": "confident, friendly, concise"
+              },
+              "copy_structure": {
+                "type": "str",
+                "display_name": "Copy Structure",
+                "value": "header"
+              },
+              "length_constraints": {
+                "type": "str",
+                "display_name": "Length Constraints JSON",
+                "value": "{\"header\": {\"min\": 30, \"max\": 60}}"
+              },
+              "keywords_required": {
+                "type": "str",
+                "display_name": "Required Keywords JSON",
+                "value": "[\"free delivery\"]"
+              },
+              "keywords_excluded": {
+                "type": "str",
+                "display_name": "Excluded Keywords JSON",
+                "value": "[\"cheap\", \"discount\"]"
+              },
+              "batch_size": {
+                "type": "int",
+                "display_name": "Batch Size",
+                "value": 5
+              },
+              "max_refinements": {
+                "type": "int",
+                "display_name": "Max Refinement Attempts",
+                "value": 2
+              }
+            }
+          }
+        }
+      }
+    ],
+    "edges": [],
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  }
+}

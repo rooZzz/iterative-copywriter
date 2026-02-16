@@ -1,6 +1,6 @@
 {
   "name": "Copy Refinement Pipeline",
-  "description": "Iterative copy generation and refinement pipeline based on the constrained copy generation framework. Uses the IterativeRefinementPipeline component to generate, evaluate, and refine marketing copies.",
+  "description": "Iterative copy generation and refinement pipeline based on the constrained copy generation framework (arXiv:2504.10391). Supports configurable evaluators, few-shot examples, feedback mapping, deduplication, and human review integration.",
   "endpoint_name": "copy-refinement",
   "is_component": false,
   "data": {
@@ -41,10 +41,12 @@
                 "display_name": "Target Persona",
                 "value": "budget-conscious families"
               },
-              "tone": {
+              "tone_guidelines_path": {
                 "type": "str",
-                "display_name": "Tone of Voice",
-                "value": "confident, friendly, concise"
+                "display_name": "Tone Guidelines Path",
+                "required": true,
+                "value": "/app/langflow/guidelines/tone_of_voice.json",
+                "info": "Path to tone_of_voice.json produced by the Tone Extractor component."
               },
               "copy_structure": {
                 "type": "str",
@@ -66,6 +68,11 @@
                 "display_name": "Excluded Keywords JSON",
                 "value": "[\"cheap\", \"discount\"]"
               },
+              "examples_json": {
+                "type": "str",
+                "display_name": "Few-Shot Examples JSON",
+                "value": "[{\"header\": \"Get Free Delivery on Every Order\"}]"
+              },
               "batch_size": {
                 "type": "int",
                 "display_name": "Batch Size",
@@ -75,6 +82,56 @@
                 "type": "int",
                 "display_name": "Max Refinement Attempts",
                 "value": 2
+              },
+              "evaluator_preset": {
+                "type": "str",
+                "display_name": "Evaluator Preset",
+                "value": "standard"
+              },
+              "custom_evaluators_json": {
+                "type": "str",
+                "display_name": "Custom Evaluator Sequence JSON",
+                "value": "[\"length\", \"keywords\", \"tone\"]"
+              },
+              "eval_examples_json": {
+                "type": "str",
+                "display_name": "Evaluator Few-Shot Examples JSON",
+                "value": "{}"
+              },
+              "off_brand_words_json": {
+                "type": "str",
+                "display_name": "Off-Brand Words JSON",
+                "value": "[]"
+              },
+              "punctuation_rules_json": {
+                "type": "str",
+                "display_name": "Punctuation Rules JSON",
+                "value": "{}"
+              },
+              "lexical_ordering_json": {
+                "type": "str",
+                "display_name": "Lexical Ordering Rules JSON",
+                "value": "[]"
+              },
+              "formatting_rules_json": {
+                "type": "str",
+                "display_name": "Formatting Rules JSON",
+                "value": "{\"replace_and_with_ampersand\": true, \"remove_serial_commas\": true, \"strip_trailing_periods\": true}"
+              },
+              "enable_dedup": {
+                "type": "bool",
+                "display_name": "Enable Deduplication",
+                "value": true
+              },
+              "similarity_threshold": {
+                "type": "float",
+                "display_name": "Similarity Threshold",
+                "value": 0.85
+              },
+              "feedback_log_path": {
+                "type": "str",
+                "display_name": "Feedback Log Path",
+                "value": ""
               }
             }
           }

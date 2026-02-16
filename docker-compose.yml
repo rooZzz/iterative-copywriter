@@ -11,6 +11,9 @@ services:
     environment:
       - LANGFLOW_COMPONENTS_PATH=/app/custom_components
       - LANGFLOW_AUTO_LOGIN=true
+      - LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true
+      - LANGFLOW_SECRET_KEY=VkGdMcd6fMKClyVoCudhBXH4CuE_hcwDfedq3IvUoiM
+      - PYTHONPATH=/app/custom_components/copywriting
     restart: unless-stopped
 
 volumes:

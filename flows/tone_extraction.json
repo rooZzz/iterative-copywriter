@@ -1,0 +1,59 @@
+{
+  "name": "Tone Extraction",
+  "description": "Extracts structured tone of voice guidelines from sample marketing copy. Run this flow first, then use the generated guidelines file in the Copy Refinement Pipeline.",
+  "endpoint_name": "tone-extraction",
+  "is_component": false,
+  "data": {
+    "nodes": [
+      {
+        "id": "tone-extractor-node-1",
+        "type": "genericNode",
+        "position": {
+          "x": 400,
+          "y": 200
+        },
+        "data": {
+          "id": "tone-extractor-node-1",
+          "type": "ToneExtractor",
+          "node": {
+            "display_name": "Tone Extractor",
+            "description": "Analyzes sample marketing copy to extract structured tone of voice guidelines.",
+            "template": {
+              "api_key": {
+                "type": "SecretStr",
+                "display_name": "OpenAI API Key",
+                "required": true,
+                "value": ""
+              },
+              "model": {
+                "type": "str",
+                "display_name": "Model",
+                "value": "gpt-4o-mini"
+              },
+              "sample_copy": {
+                "type": "str",
+                "display_name": "Sample Copy",
+                "required": true,
+                "value": "",
+                "info": "Paste existing marketing copy to analyze. Accepts a JSON array of copy objects or plain text with one copy per line."
+              },
+              "output_path": {
+                "type": "str",
+                "display_name": "Guidelines Output Path",
+                "required": true,
+                "value": "/app/langflow/guidelines/tone_of_voice.json",
+                "info": "File path where the extracted tone guidelines will be saved."
+              }
+            }
+          }
+        }
+      }
+    ],
+    "edges": [],
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  }
+}

@@ -2,7 +2,7 @@ FROM langflowai/langflow:latest
 
 COPY components/ /app/custom_components/
 
-RUN mkdir -p /app/langflow/guidelines && chmod 777 /app/langflow/guidelines
+RUN mkdir -p /app/langflow/guidelines && chmod -R 777 /app/langflow
 
 ENV LANGFLOW_COMPONENTS_PATH=/app/custom_components
 ENV LANGFLOW_AUTO_LOGIN=true

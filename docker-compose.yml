@@ -10,6 +10,7 @@ services:
       - .env
     environment:
       - LANGFLOW_COMPONENTS_PATH=/app/custom_components
+      - LANGFLOW_DATABASE_URL=sqlite:////app/langflow/langflow.db
       - LANGFLOW_AUTO_LOGIN=true
       - LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true
       - LANGFLOW_SECRET_KEY=VkGdMcd6fMKClyVoCudhBXH4CuE_hcwDfedq3IvUoiM

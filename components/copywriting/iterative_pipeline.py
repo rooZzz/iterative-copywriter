@@ -49,6 +49,13 @@ def _generate_copies(client, model, topic, persona, tone_guidelines, copy_struct
         f"Topic: {topic}",
         f"Target audience: {persona}",
         "",
+        "CRITICAL RULES FOR USING THE TOPIC:",
+        "- Every copy MUST reference specific details from the topic above: product names, stats, features, or concrete benefits.",
+        "- Do NOT write generic headlines that could apply to any product. If the topic says '50% debt reduction', USE that number.",
+        "- Do NOT invent facts, statistics, or claims that are not in the topic.",
+        "- At least half of your copies should include the product/service name from the topic.",
+        "- Vary HOW you use the details (lead with the stat, lead with the action, lead with the product name) but always ground the copy in the topic.",
+        "",
         "Tone of voice guidelines:",
         guidelines_block,
         "",
@@ -90,7 +97,7 @@ def _generate_copies(client, model, topic, persona, tone_guidelines, copy_struct
     parts.append("")
     parts.append(
         'Return a JSON object with a "copies" key containing an array of copy objects. '
-        "Be creative and diverse."
+        "Vary the angle and structure of each copy, but every one must be grounded in specific details from the topic."
     )
 
     response = client.chat.completions.create(
@@ -289,9 +296,66 @@ class IterativeRefinementPipeline(Component):
             raw = raw.text
         return str(raw).strip()
 
+    def _validate_topic(self, client, topic):
+        prompt_parts = [
+            "You are a creative brief reviewer. Your job is to decide whether a topic description is detailed enough for a copywriter to write a marketing headline WITHOUT inventing facts.",
+            "",
+            "A good topic should contain ENOUGH of the following:",
+            "- Product or service name",
+            "- What the product/service actually does (specific benefit or value proposition)",
+            "- At least one concrete detail: a stat, feature, differentiator, or proof point",
+            "- Some indication of the target audience",
+            "",
+            "It does NOT need all four, but it needs enough substance that a copywriter would not have to guess or make things up.",
+            "",
+            f"Topic to evaluate:\n{topic}",
+            "",
+            "Examples of INSUFFICIENT topics:",
+            '- "Credit Fixer" (just a name, no details)',
+            '- "A tool that helps with debt" (no product name, no specifics)',
+            '- "Improve your finances" (completely generic)',
+            "",
+            "Examples of SUFFICIENT topics:",
+            '- "CreditFixer helps users manage debt repayment and improve their credit score. Average users repay 50% of debt and gain 50 points."',
+            '- "Experian Boost — free tool that adds positive utility and streaming payments to your credit report, available to all UK consumers"',
+            "",
+            "If the topic is insufficient, list exactly what is missing and provide a suggestion showing how the topic could be improved. Base your suggestion ONLY on what is already implied by the topic — do NOT invent new features or statistics.",
+            "",
+            'Return a JSON object: {"pass": true/false, "missing": ["list of what is missing"], "suggestion": "an improved version of the topic"}',
+        ]
+
+        response = client.chat.completions.create(
+            model=self.evaluation_model,
+            messages=[{"role": "user", "content": "\n".join(prompt_parts)}],
+            temperature=0.1,
+            response_format={"type": "json_object"},
+        )
+
+        return json.loads(response.choices[0].message.content)
+
     def _execute_pipeline(self):
         client = OpenAI(api_key=self.api_key)
         topic = self._resolve_topic()
+
+        topic_check = self._validate_topic(client, topic)
+        if not topic_check.get("pass", False):
+            return {
+                "topic": topic,
+                "topic_rejected": True,
+                "topic_feedback": topic_check,
+                "summary": {
+                    "total_generated": 0,
+                    "accepted": 0,
+                    "rejected": 0,
+                    "duplicates_removed": 0,
+                    "success_rate": 0.0,
+                    "evaluator_preset": self.evaluator_preset,
+                    "evaluator_sequence": [],
+                },
+                "accepted_copies": [],
+                "rejected_copies": [],
+                "detailed_log": [],
+            }
 
         tone_guidelines = self._parse_tone_guidelines()
 
@@ -412,27 +476,109 @@ class IterativeRefinementPipeline(Component):
 
     def run_pipeline_chat(self) -> Message:
         result = self._execute_pipeline()
+
+        if result.get("topic_rejected"):
+            feedback = result.get("topic_feedback", {})
+            missing = feedback.get("missing", [])
+            suggestion = feedback.get("suggestion", "")
+            lines = []
+            lines.append("**Your topic needs more detail before I can generate copy.**")
+            lines.append("")
+            if missing:
+                lines.append("**Missing:**")
+                for item in missing:
+                    lines.append(f"- {item}")
+                lines.append("")
+            if suggestion:
+                lines.append("**Example of a stronger topic:**")
+                lines.append(f'"{suggestion}"')
+                lines.append("")
+            lines.append("Please try again with more detail.")
+            return Message(text="\n".join(lines))
+
         accepted = result["accepted_copies"]
-        rejected_count = result["summary"]["rejected"]
+        rejected = result["rejected_copies"]
         total = result["summary"]["total_generated"]
         topic = result["topic"]
+        log = result["detailed_log"]
 
         lines = []
         lines.append(f"**Copy for: {topic}**")
         lines.append("")
-        lines.append(f"Generated {total} variants — {len(accepted)} accepted, {rejected_count} rejected.")
+        lines.append(f"Generated {total} variants — {len(accepted)} accepted, {len(rejected)} rejected.")
         lines.append("")
 
-        if not accepted:
-            lines.append("No copies passed evaluation. Try adjusting the topic or relaxing the evaluator preset.")
-        else:
-            for i, copy in enumerate(accepted, 1):
+        if accepted:
+            lines.append("## Accepted")
+            lines.append("")
+            accept_num = 0
+            for entry in log:
+                attempts = entry.get("attempts", [])
+                if not attempts:
+                    continue
+                if not attempts[-1].get("passed"):
+                    continue
+                accept_num += 1
+                final_copy = attempts[-1].get("copy", {})
                 lines.append(f"---")
-                lines.append(f"**Option {i}**")
+                lines.append(f"**Option {accept_num}**")
                 lines.append("")
-                for key, value in copy.items():
+                for key, value in final_copy.items():
                     label = key.replace("_", " ").title()
                     lines.append(f"**{label}:** {value}")
                 lines.append("")
+                if len(attempts) > 1:
+                    lines.append("*Refinement history:*")
+                    lines.append("")
+                    for att in attempts[:-1]:
+                        attempt_num = att.get("attempt", 0)
+                        copy = att.get("copy", {})
+                        copy_text = " | ".join(f"{k}: {v}" for k, v in copy.items())
+                        failed = att.get("failed_evaluator", "")
+                        feedback = att.get("feedback", "")
+                        if attempt_num == 0:
+                            label = "Original"
+                        else:
+                            label = f"Refinement {attempt_num}"
+                        lines.append(f"{label}: {copy_text}")
+                        if failed:
+                            lines.append("")
+                            lines.append(f"Failed: {failed}")
+                            lines.append(f"{feedback}")
+                        lines.append("")
+
+        if rejected:
+            lines.append("## Rejected")
+            lines.append("")
+            reject_num = 0
+            for entry in log:
+                attempts = entry.get("attempts", [])
+                if not attempts:
+                    continue
+                if attempts[-1].get("passed"):
+                    continue
+                reject_num += 1
+                lines.append(f"---")
+                lines.append(f"**Rejected #{reject_num}**")
+                lines.append("")
+                for att in attempts:
+                    attempt_num = att.get("attempt", 0)
+                    copy = att.get("copy", {})
+                    copy_text = " | ".join(f"{k}: {v}" for k, v in copy.items())
+                    failed = att.get("failed_evaluator", "")
+                    feedback = att.get("feedback", "")
+                    if attempt_num == 0:
+                        label = "Original"
+                    else:
+                        label = f"Refinement {attempt_num}"
+                    lines.append(f"**{label}:** {copy_text}")
+                    if failed:
+                        lines.append("")
+                        lines.append(f"Failed: {failed}")
+                        lines.append(f"{feedback}")
+                    lines.append("")
+
+        if not accepted and not rejected:
+            lines.append("No copies were generated. Check the topic and try again.")
 
         return Message(text="\n".join(lines))

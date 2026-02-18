@@ -133,17 +133,32 @@ def check_tone(client, model, copy_dict, tone_guidelines, examples=None):
     copy_text = " | ".join(f"{k}: {v}" for k, v in copy_dict.items())
     guidelines_block = format_guidelines_for_prompt(tone_guidelines)
 
+    on_brand = tone_guidelines.get("examples", {}).get("on_brand", [])
+    off_brand = tone_guidelines.get("examples", {}).get("off_brand", [])
+
     parts = [
-        "You are a senior copy editor evaluating tone of voice against brand guidelines.",
-        "Be strict but fair. Reject copy that clearly violates the guidelines, but pass copy that genuinely follows the style patterns.",
+        "You are a senior brand copy editor evaluating tone of voice against guidelines.",
+        "Be strict but fair. Your job is to catch copy that genuinely misses the brand voice, not to demand perfection.",
         "",
         "Tone of voice guidelines:",
         guidelines_block,
         "",
     ]
 
+    if on_brand:
+        parts.append("ON-BRAND EXAMPLES (use these as your reference for what good looks like):")
+        for i, ex in enumerate(on_brand, 1):
+            parts.append(f"  {i}. {ex}")
+        parts.append("")
+
+    if off_brand:
+        parts.append("OFF-BRAND EXAMPLES (reject copy that sounds more like these than the on-brand examples):")
+        for i, ex in enumerate(off_brand, 1):
+            parts.append(f"  {i}. {ex}")
+        parts.append("")
+
     if examples:
-        parts.append("Here are examples of previous evaluations for calibration:")
+        parts.append("Previous evaluation examples for calibration:")
         for i, ex in enumerate(examples, 1):
             parts.append(f"Example {i}: {json.dumps(ex)}")
         parts.append("")
@@ -151,25 +166,26 @@ def check_tone(client, model, copy_dict, tone_guidelines, examples=None):
     parts.extend([
         f"Copy to evaluate:\n{copy_text}",
         "",
-        "REJECT the copy if:",
-        "- It uses vague motivational language with no concrete claim (e.g. 'Unlock your potential', 'Empower your journey')",
-        "- The sentence structure doesn't match the guidelines (e.g. flowery and long when guidelines say short and direct)",
-        "- It sounds like generic marketing that ignores the brand voice entirely",
+        "REJECT the copy if ANY of these are true:",
+        "- It communicates no specific benefit or action — just vague aspirational language (e.g. 'Unlock your potential', 'Your journey to freedom', 'Take control')",
+        "- The sentence structure clearly clashes with the on-brand examples (e.g. flowery and long when examples are short and direct)",
         "- It reads more like the off-brand examples than the on-brand examples",
+        "- It is GENERIC: you could replace the product name with any competitor and the copy would still work. Good copy is grounded in specific details.",
+        "- It contains words like 'effectively', 'seamlessly', 'effortlessly' that add no meaning",
         "",
         "PASS the copy if:",
-        "- It follows the same style patterns as the on-brand examples (structure, specificity, tone)",
-        "- It includes concrete details, numbers, or specific claims",
-        "- It uses direct, simple language matching the guidelines",
-        "- The formality and emotional register are correct",
+        "- It communicates a specific benefit, feature, or action grounded in real product details",
+        "- The style, structure, and register are consistent with the on-brand examples",
+        "- The formality level matches the guidelines",
+        "- It may not be perfect, but it genuinely sounds like it belongs to this brand and refers to something concrete",
         "",
         "Think step by step:",
-        "1. Does the copy follow the same STYLE PATTERNS as the on-brand examples (directness, specificity, structure)?",
-        "2. Does it use concrete details or specific claims rather than vague aspirations?",
-        "3. Does the formality, vocabulary, and sentence structure match the guidelines?",
-        "4. Does it sound more like the on-brand or off-brand examples?",
+        "1. What specific claim or benefit does the copy communicate? If the answer is 'nothing specific' or just a vague category like 'better credit', REJECT.",
+        "2. Does the style and structure match the on-brand examples?",
+        "3. Does it sound more like the on-brand or off-brand examples?",
+        "4. Is the formality and emotional register correct?",
         "",
-        "If feedback is needed, be SPECIFIC about what to change. Don't just say 'be more specific' - explain exactly what's wrong and suggest a concrete fix.",
+        "CRITICAL: When providing feedback or rewrite suggestions, use ONLY facts and details that appear in the tone guidelines or the copy itself. Do NOT invent statistics, user counts, timeframes, or features. If you mention a number, it must come from the guidelines or the copy being evaluated. Hallucinating facts is strictly forbidden.",
         "",
         'Return a JSON object: {"pass": true/false, "reasoning": "...", "feedback": "..."}',
     ])
@@ -192,24 +208,33 @@ def check_coherence(client, model, copy_dict, examples=None):
     copy_text = "\n".join(f"{k}: {v}" for k, v in copy_dict.items())
 
     parts = [
-        "You are a copy editor evaluating the coherence of a multi-part marketing copy.",
+        "You are a copy editor evaluating whether a header and subheader work well together as marketing copy.",
         "",
         f"Copy components:\n{copy_text}",
         "",
     ]
 
     if examples:
-        parts.append("Here are examples of previous evaluations for calibration:")
+        parts.append("Previous evaluation examples for calibration:")
         for i, ex in enumerate(examples, 1):
             parts.append(f"Example {i}: {json.dumps(ex)}")
         parts.append("")
 
     parts.extend([
-        "Think step by step:",
-        "1. Read the header and subheader together",
-        "2. Check if they form a coherent, connected message",
-        "3. Check if the subheader adds new information rather than repeating the header",
-        "4. Check if the overall message flows naturally",
+        "In good marketing copy, the header and subheader have DIFFERENT but COMPLEMENTARY roles:",
+        "- Header: the hook — grabs attention with a key benefit, claim, or action",
+        "- Subheader: the detail — adds supporting information, specifics, or a secondary benefit",
+        "",
+        "PASS if:",
+        "- The header and subheader are about the same product/topic (they don't contradict each other)",
+        "- The subheader adds NEW information rather than just restating the header",
+        "- A reader would understand the overall message when reading both together",
+        "- It is completely fine for the header to focus on one benefit (e.g. debt reduction) and the subheader on another (e.g. credit score improvement) — these are complementary, not incoherent",
+        "",
+        "REJECT only if:",
+        "- The header and subheader actively contradict each other",
+        "- The subheader is just the header rephrased with no new information",
+        "- They seem to be about completely unrelated topics",
         "",
         'Return a JSON object: {"pass": true/false, "reasoning": "...", "feedback": "..."}',
     ])
@@ -229,7 +254,8 @@ def check_topic_relevance(client, model, copy_dict, topic, persona, examples=Non
     copy_text = " | ".join(f"{k}: {v}" for k, v in copy_dict.items())
 
     parts = [
-        "You are a marketing strategist evaluating whether a copy conveys its intended message.",
+        "You are a strict marketing strategist evaluating whether copy actually communicates the intended topic.",
+        "Be demanding. The copy must convey the SPECIFIC value proposition, not just vaguely gesture at the category.",
         "",
         f"Intended topic: {topic}",
         f"Target audience: {persona}",
@@ -237,7 +263,7 @@ def check_topic_relevance(client, model, copy_dict, topic, persona, examples=Non
     ]
 
     if examples:
-        parts.append("Here are examples of previous evaluations for calibration:")
+        parts.append("Previous evaluation examples for calibration:")
         for i, ex in enumerate(examples, 1):
             parts.append(f"Example {i}: {json.dumps(ex)}")
         parts.append("")
@@ -245,11 +271,24 @@ def check_topic_relevance(client, model, copy_dict, topic, persona, examples=Non
     parts.extend([
         f"Copy to evaluate:\n{copy_text}",
         "",
+        "REJECT if:",
+        "- The copy only vaguely relates to the topic (e.g. topic is 'CreditFixer debt reduction tool' but copy just says 'better credit')",
+        "- The copy could apply to ANY product in the same category, not specifically THIS product/service",
+        "- The key differentiators or specific features mentioned in the topic are missing from the copy",
+        "- A reader would not understand what the product actually DOES from reading the copy alone",
+        "",
+        "PASS only if:",
+        "- The copy clearly communicates the specific product/service and its key benefit",
+        "- A reader unfamiliar with the brand would understand the core value proposition",
+        "- The copy addresses the target audience's actual needs",
+        "",
         "Think step by step:",
-        "1. Identify the main message conveyed by the copy",
-        "2. Compare it against the intended topic",
-        "3. Assess whether the copy would resonate with the target audience",
-        "4. Decide if the copy successfully communicates the value proposition",
+        "1. What specific product, service, or feature does the topic describe?",
+        "2. Does the copy communicate that specific thing, or just the general category?",
+        "3. Would a reader understand what is being offered and why they should care?",
+        "4. Is there enough specificity that this copy could ONLY be about this topic?",
+        "",
+        "If rejecting, explain exactly what topic details are missing and suggest how to include them.",
         "",
         'Return a JSON object: {"pass": true/false, "reasoning": "...", "feedback": "..."}',
     ])

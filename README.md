@@ -11,37 +11,30 @@ The system uses two flows that share a persistent tone guidelines file:
 ```mermaid
 flowchart TB
     subgraph extraction ["Flow 1: Tone Extraction (run once)"]
-        SampleCopy["Sample Copy"] --> ToneExtractor["Tone Extractor"]
+        direction LR
+        SampleCopy[Sample Copy] --> ToneExtractor[Tone Extractor]
     end
 
-    ToneExtractor --> GuidelinesFile["tone_of_voice.json"]
+    ToneExtractor --> Guidelines[tone_of_voice.json]
 
     subgraph refinement ["Flow 2: Copy Refinement (run many times)"]
-        Input["Input (topic, constraints, persona, examples)"]
-        Generator["Generator"]
-        Formatter["Formatter"]
-        Evaluators["Evaluator Block"]
-        FeedbackMapper["Feedback Mapper"]
-        Refiner["Refiner"]
-        Dedup["Deduplication"]
-        HumanReview["Human Review"]
-
-        Input --> Generator
-        Generator --> Formatter
-        Formatter --> Evaluators
-        Evaluators -->|Pass| Dedup
-        Evaluators -->|Fail| FeedbackMapper
-        FeedbackMapper --> Refiner
-        Refiner -->|"back to Formatter (up to J attempts)"| Formatter
-        Dedup --> HumanReview
+        direction TB
+        Input[Input] --> Generator[Generator]
+        Generator --> Formatter[Formatter]
+        Formatter --> Evaluators[Evaluators]
+        Evaluators -->|Pass| Dedup[Deduplication]
+        Evaluators -->|Fail| FeedbackMapper[Feedback Mapper]
+        FeedbackMapper --> Refiner[Refiner]
+        Refiner -->|"retry (≤J)"| Formatter
+        Dedup --> HumanReview[Human Review]
     end
 
-    HumanReview --> FeedbackLog["feedback_log.json"]
-    FeedbackLog -->|"negative examples on next run"| Generator
+    HumanReview --> FeedbackLog[feedback_log.json]
 
-    GuidelinesFile --> Generator
-    GuidelinesFile --> Evaluators
-    GuidelinesFile --> FeedbackMapper
+    Guidelines -.-> Generator
+    Guidelines -.-> Evaluators
+    Guidelines -.-> FeedbackMapper
+    FeedbackLog -.->|negative examples| Generator
 ```
 
 ## Quick Start
